@@ -309,7 +309,7 @@ def fazer_login(driver):
 
 def navegar_ate_odds(driver):
     """
-    Navega até a página de odds do Bet365.
+    Navega até a página de odds do Bet365 e seleciona o mercado.
     """
     try:
         print("\n🎯 Navegando até Bet365...")
@@ -348,7 +348,12 @@ def navegar_ate_odds(driver):
             EC.presence_of_element_located((By.CLASS_NAME, "br-tb"))
         )
         
-        print("✓ Navegação concluída! Grid carregado.")
+        # Selecionar mercado ANTES de raspar
+        print("\n" + "=" * 60)
+        escolher_mercado(driver)
+        print("=" * 60)
+        
+        print("✓ Navegação concluída! Mercado selecionado.")
         return True
         
     except Exception as e:
@@ -402,15 +407,10 @@ def main():
             driver.quit()
             return
         
-        # Navegar até odds
+        # Navegar até odds (inclui seleção de mercado)
         if not navegar_ate_odds(driver):
             driver.quit()
             return
-        
-        # Selecionar mercado
-        print("\n" + "=" * 60)
-        escolher_mercado(driver)
-        print("=" * 60)
         
         # Capturar HTML
         print("\n📥 Capturando HTML do grid...")
