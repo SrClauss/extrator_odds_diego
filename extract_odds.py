@@ -204,6 +204,69 @@ def capturar_html_selenium(driver):
         return None
 
 
+def escolher_mercado(driver):
+    """
+    Exibe menu de mercados e seleciona o desejado.
+    """
+    from selenium.webdriver.support.ui import Select
+    
+    mercados = [
+        "Resultado Final",
+        "Over Gols",
+        "Under Gols",
+        "Para o Time Marcar Sim/Não",
+        "Resultado Correto - FT",
+        "Primeiro Marcador de Gol",
+        "Resultado Correto - Grupo",
+        "Resultado/Para Ambos Times Marcarem",
+        "Dupla Hipótese",
+        "Intervalo/Final do Jogo",
+        "Total de Gols Exatos",
+        "Intervalo - Resultado",
+        "Resultado Correto - HT",
+        "Margem de Vitória",
+        "Time a Marcar",
+        "Time - Gols",
+        "Handicap - Resultado"
+    ]
+    
+    print("\n" + "=" * 60)
+    print(" SELECIONE UM MERCADO")
+    print("=" * 60 + "\n")
+    
+    for i, mercado in enumerate(mercados, 1):
+        print(f" {i:2d}. {mercado}")
+    
+    print("\n")
+    while True:
+        try:
+            opcao = int(input("Digite o número do mercado desejado: ").strip())
+            if 1 <= opcao <= len(mercados):
+                mercado_selecionado = mercados[opcao - 1]
+                print(f"\n✅ Mercado selecionado: {mercado_selecionado}")
+                break
+            else:
+                print("❌ Opção inválida! Digite um número da lista.")
+        except ValueError:
+            print("❌ Digite um número válido!")
+    
+    # Selecionar o mercado no select do Selenium
+    print(f"🔄 Aplicando filtro...")
+    try:
+        select_element = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.TAG_NAME, "select"))
+        )
+        select = Select(select_element)
+        select.select_by_visible_text(mercado_selecionado)
+        time.sleep(1)
+        print(f"✓ Filtro aplicado com sucesso!")
+        return mercado_selecionado
+    except Exception as e:
+        print(f"⚠️  Erro ao selecionar mercado: {e}")
+        print("Continuando com mercado padrão...")
+        return mercado_selecionado
+
+
 def fazer_login(driver):
     """
     Faz login no site UltraVirtual.
@@ -343,6 +406,11 @@ def main():
         if not navegar_ate_odds(driver):
             driver.quit()
             return
+        
+        # Selecionar mercado
+        print("\n" + "=" * 60)
+        escolher_mercado(driver)
+        print("=" * 60)
         
         # Capturar HTML
         print("\n📥 Capturando HTML do grid...")
