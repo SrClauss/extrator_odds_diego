@@ -444,6 +444,9 @@ def main():
     
     print(f"✓ Arquivo será salvo como: {nome_arquivo}")
     
+    # Pedir PRIMEIRA opção de mercado ANTES de abrir o driver
+    mercado_selecionado = obter_escolha_mercado()
+    
     # Criar workbook UMA VEZ (será reutilizado para todas as abas)
     workbook = Workbook()
     primeira_aba = True  # Flag para remover aba padrão na primeira iteração
@@ -470,11 +473,8 @@ def main():
             driver.quit()
             return
         
-        # Loop para extrair múltiplos mercados
+        # Loop para extrair múltiplos mercados - começando com a PRIMEIRA opção
         while True:
-            # Obter escolha de mercado
-            mercado_selecionado = obter_escolha_mercado()
-            
             # Navegar até odds com mercado pré-selecionado
             if not navegar_ate_odds(driver, mercado_selecionado):
                 break
@@ -500,7 +500,21 @@ def main():
             
             if not odds_data:
                 print("❌ Nenhuma odd foi encontrada!")
-                continue
+                # Perguntar se quer tentar outro mercado mesmo com erro
+                print("\n" + "=" * 60)
+                while True:
+                    resposta = input("Deseja extrair odds de outro mercado? (s/n): ").strip().lower()
+                    if resposta in ['s', 'sim', 'n', 'não', 'nao']:
+                        break
+                    print("❌ Digite 's' para SIM ou 'n' para NÃO")
+                
+                if resposta in ['n', 'não', 'nao']:
+                    print("\n🏁 Encerrando aplicação...")
+                    break
+                else:
+                    # Pedir novo mercado
+                    mercado_selecionado = obter_escolha_mercado()
+                    continue
             
             print(f"\n📊 Agregando odds...")
             dados_planilha = agregar_odds(odds_data)
@@ -554,6 +568,9 @@ def main():
             if resposta in ['n', 'não', 'nao']:
                 print("\n🏁 Encerrando aplicação...")
                 break
+            else:
+                # Pedir novo mercado
+                mercado_selecionado = obter_escolha_mercado()
             
     finally:
         print("\n🔒 Fechando navegador...")
@@ -570,6 +587,7 @@ def main():
     
     print("\n✨ Processo finalizado!")
     print("=" * 60)
+
 
 
 
