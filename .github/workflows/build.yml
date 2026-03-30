@@ -21,54 +21,57 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        cache: 'pip'
 
     - name: Instalar dependências
       run: |
         python -m pip install --upgrade pip
         pip install beautifulsoup4 openpyxl selenium webdriver-manager
         pip install pyinstaller pyarmor
+      shell: pwsh
 
     - name: Ofuscar código com PyArmor
       run: |
         pyarmor gen -O dist-obf extract_odds.py
+      shell: pwsh
       continue-on-error: true
 
     - name: Build com PyInstaller (código ofuscado)
       if: success()
       run: |
-        pyinstaller --onefile --noconsole --name "ExtractOdds" `
-          --icon=NONE `
-          --add-data "README.md;." `
-          --hidden-import=selenium `
-          --hidden-import=webdriver_manager `
-          --hidden-import=bs4 `
-          --hidden-import=openpyxl `
-          dist-obf/extract_odds.py
+        if (Test-Path "dist-obf/extract_odds.py") {
+          pyinstaller --onefile --name "ExtractOdds" --hidden-import=selenium --hidden-import=webdriver_manager --hidden-import=bs4 --hidden-import=openpyxl dist-obf/extract_odds.py
+        } else {
+          Write-Host "Arquivo ofuscado nao encontrado, usando original"
+          exit 1
+        }
+      shell: pwsh
       continue-on-error: true
 
     - name: Build com PyInstaller (fallback - código original)
       if: failure()
       run: |
-        pyinstaller --onefile --noconsole --name "ExtractOdds" `
-          --icon=NONE `
-          --add-data "README.md;." `
-          --hidden-import=selenium `
-          --hidden-import=webdriver_manager `
-          --hidden-import=bs4 `
-          --hidden-import=openpyxl `
-          extract_odds.py
+        pyinstaller --onefile --name "ExtractOdds" --hidden-import=selenium --hidden-import=webdriver_manager --hidden-import=bs4 --hidden-import=openpyxl extract_odds.py
+      shell: pwsh
 
     - name: Copiar arquivos auxiliares
       run: |
-        Copy-Item run_extract_odds.bat dist/
-        Copy-Item run_quick.bat dist/
-        Copy-Item requirements_minimo.txt dist/requirements.txt
-        Copy-Item README.md dist/
+        if (Test-Path "dist/ExtractOdds.exe") {
+          Copy-Item run_extract_odds.bat dist/ -ErrorAction SilentlyContinue
+          Copy-Item run_quick.bat dist/ -ErrorAction SilentlyContinue
+          Copy-Item requirements_minimo.txt dist/requirements.txt -ErrorAction SilentlyContinue
+          Copy-Item README.md dist/ -ErrorAction SilentlyContinue
+          Write-Host "Arquivos copiados com sucesso"
+        } else {
+          Write-Host "Executavel nao encontrado!"
+          exit 1
+        }
+      shell: pwsh
 
     - name: Criar pacote de distribuição
       run: |
-        Compress-Archive -Path dist/* -DestinationPath ExtractOdds-Windows.zip
+        Compress-Archive -Path dist/* -DestinationPath ExtractOdds-Windows.zip -Force
+        Write-Host "Pacote criado com sucesso"
+      shell: pwsh
 
     - name: Upload do executável
       uses: actions/upload-artifact@v4
