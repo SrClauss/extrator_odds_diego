@@ -32,11 +32,32 @@ python extract_odds.py
 2. Acessa ultravirtual.com.br
 3. Faz login (credenciais embutidas)
 4. Navega até Bet365 → Placar FT → Odds
-5. Captura todas as odds do grid
-6. Exporta para Excel com formatação:
+5. **Exibe menu para escolher o mercado** (17 opções disponíveis)
+6. Captura todas as odds do mercado selecionado
+7. Exporta para Excel com formatação:
    - 🟢 Verde: odds positivas
    - 🔴 Vermelho: odds negativas
    - 📊 Estatísticas completas
+
+### Mercados Disponíveis
+
+- Resultado Final
+- Over Gols
+- Under Gols
+- Para o Time Marcar Sim/Não
+- Resultado Correto - FT
+- Primeiro Marcador de Gol
+- Resultado Correto - Grupo
+- Resultado/Para Ambos Times Marcarem
+- Dupla Hipótese
+- Intervalo/Final do Jogo
+- Total de Gols Exatos
+- Intervalo - Resultado
+- Resultado Correto - HT
+- Margem de Vitória
+- Time a Marcar
+- Time - Gols
+- Handicap - Resultado
 
 ---
 
