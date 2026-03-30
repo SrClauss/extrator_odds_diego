@@ -1,48 +1,42 @@
 # Extrator de Odds - UltraVirtual para Excel
 
-## 📦 Instalação e Uso (Windows)
+Script automatizado para extrair odds do UltraVirtual (Bet365) e exportar para Excel com formatação.
 
-### Método Automático (Recomendado)
+---
 
-1. **Baixe os arquivos:**
-   - `extract_odds.py`
-   - `run_extract_odds.bat`
-   - `requirements_minimo.txt` (renomeie para `requirements.txt`)
+## 📦 Instalação
 
-2. **Execute o instalador:**
-   - Duplo clique em `run_extract_odds.bat`
-   - O script irá:
-     - ✅ Verificar/Instalar Python
-     - ✅ Criar ambiente virtual
-     - ✅ Instalar dependências
-     - ✅ Executar o extrator
+### Requisitos
+- Python 3.11+
+- Google Chrome instalado
 
-3. **Pronto!**
-   - Digite o nome do arquivo Excel quando solicitado
-   - Aguarde a automação completar
+### Setup
+
+```bash
+# Clone o repositório
+git clone https://github.com/SrClauss/extrator_odds_diego.git
+cd extrator_odds_diego
+
+# Instale as dependências
+pip install beautifulsoup4 openpyxl selenium webdriver-manager
+
+# Execute
+python extract_odds.py
+```
 
 ---
 
 ## 🚀 O que o script faz?
 
-1. Abre o navegador Chrome
+1. Abre o navegador Chrome automaticamente
 2. Acessa ultravirtual.com.br
-3. Faz login automaticamente
+3. Faz login (credenciais embutidas)
 4. Navega até Bet365 → Placar FT → Odds
 5. Captura todas as odds do grid
 6. Exporta para Excel com formatação:
-   - Verde: odds positivas
-   - Vermelho: odds negativas
-   - Estatísticas completas
-
----
-
-## 📋 Requisitos
-
-- **Windows 7 ou superior**
-- **Google Chrome instalado** (navegador)
-- **Conexão com internet**
-- Python será instalado automaticamente se necessário
+   - 🟢 Verde: odds positivas
+   - 🔴 Vermelho: odds negativas
+   - 📊 Estatísticas completas
 
 ---
 
@@ -54,26 +48,58 @@ O software expira automaticamente após essa data.
 
 ---
 
-## 🔧 Build do Projeto
+## 🔧 Build Executável (Windows)
 
-### Para Desenvolvedores
+### PyInstaller
 
-**Build local (Windows):**
 ```bash
-build.bat
+pip install pyinstaller
+
+pyinstaller --onefile --name "ExtractOdds" \
+  --hidden-import=selenium \
+  --hidden-import=webdriver_manager \
+  --hidden-import=bs4 \
+  --hidden-import=openpyxl \
+  extract_odds.py
 ```
 
-**Build via GitHub Actions:**
-- Push para branch `main` ou `master`
-- Ou crie uma tag: `git tag v1.0.0 && git push --tags`
-- O executável será gerado automaticamente
+Executável gerado em: `dist/ExtractOdds.exe`
+
+### Build via GitHub Actions
+
+1. Vá para: https://github.com/SrClauss/extrator_odds_diego/actions
+2. Clique em "Build Extrator de Odds"
+3. Clique em "Run workflow"
+4. Aguarde ~5-10 minutos
+5. Baixe o artifact gerado
+
+Ou crie uma tag de versão:
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
 
 ---
 
-## 📁 Arquivos Gerados
+## 📁 Saída
 
-- `ExtractOdds.exe` - Executável standalone
-- `*.xlsx` - Arquivos Excel com as odds extraídas
+- Arquivo `.xlsx` com nome definido pelo usuário
+- Colunas: Odd | Verde | Vermelho | Total
+- Headers formatados
+- Dados com cores por categoria
+
+---
+
+## 🔐 Recursos
+
+- ✅ Automação completa via Selenium
+- ✅ Login automático
+- ✅ Captura inteligente de odds
+- ✅ Agregação por valor
+- ✅ Formatação Excel profissional
+- ✅ Contagem de verdes/vermelhos
+- ✅ Estatísticas resumidas
+- ✅ Limitação temporal de uso
 
 ---
 
@@ -82,4 +108,6 @@ build.bat
 Em caso de problemas:
 1. Verifique se o Chrome está atualizado
 2. Verifique sua conexão com internet
-3. Entre em contato para suporte técnico
+3. Verifique a validade da licença
+
+**Repositório:** https://github.com/SrClauss/extrator_odds_diego

@@ -1,13 +1,10 @@
 name: Build Extrator de Odds
 
 on:
+  workflow_dispatch:  # Apenas manual
   push:
-    branches: [ main, master ]
     tags:
-      - 'v*'
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+      - 'v*'  # Apenas quando criar tags de versão
 
 jobs:
   build-windows:
@@ -56,8 +53,6 @@ jobs:
     - name: Copiar arquivos auxiliares
       run: |
         if (Test-Path "dist/ExtractOdds.exe") {
-          Copy-Item run_extract_odds.bat dist/ -ErrorAction SilentlyContinue
-          Copy-Item run_quick.bat dist/ -ErrorAction SilentlyContinue
           Copy-Item requirements_minimo.txt dist/requirements.txt -ErrorAction SilentlyContinue
           Copy-Item README.md dist/ -ErrorAction SilentlyContinue
           Write-Host "Arquivos copiados com sucesso"

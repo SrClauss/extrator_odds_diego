@@ -8,9 +8,26 @@
 
 ## 🚀 Como o CI/CD funciona
 
-### Build Automático
+### Build Manual
 
-Toda vez que você fizer um push para `master` ou criar uma **tag**, o GitHub Actions irá:
+O GitHub Actions está configurado para build **manual apenas**.
+
+**Como fazer build:**
+
+1. Acesse: https://github.com/SrClauss/extrator_odds_diego/actions
+2. Clique em "Build Extrator de Odds"
+3. Clique em "Run workflow" → "Run workflow"
+4. Aguarde ~5-10 minutos
+5. Baixe o artifact `ExtractOdds-Windows`
+
+**Ou crie uma tag de versão:**
+```bash
+git tag v1.0.0
+git push origin v1.0.0
+```
+O build será acionado automaticamente para releases.
+
+### O que o build faz
 
 1. ✅ Instalar Python 3.11
 2. ✅ Instalar todas as dependências
@@ -18,21 +35,6 @@ Toda vez que você fizer um push para `master` ou criar uma **tag**, o GitHub Ac
 4. ✅ Compilar com PyInstaller (gera executável único)
 5. ✅ Criar pacote ZIP com todos os arquivos
 6. ✅ Disponibilizar para download
-
-### Como acessar os builds
-
-**Opção 1: Artifacts (pushes normais)**
-- Vá para: https://github.com/SrClauss/extrator_odds_diego/actions
-- Clique no workflow mais recente
-- Baixe o artifact `ExtractOdds-Windows`
-
-**Opção 2: Releases (com tags)**
-```bash
-git tag v1.0.0
-git push origin v1.0.0
-```
-- O executável será anexado automaticamente à release
-- Acesse: https://github.com/SrClauss/extrator_odds_diego/releases
 
 ---
 
@@ -54,10 +56,11 @@ git push origin v1.0.0
 - ✅ Sem necessidade de Python no cliente
 - ✅ Inclui ChromeDriver automático
 
-### 4. Scripts de Instalação
-- ✅ `run_extract_odds.bat` - Instalador completo
-- ✅ `run_quick.bat` - Execução rápida
-- ✅ `build.bat` - Build local para testes
+### 4. Build com PyInstaller
+- ✅ GitHub Actions manual ou por tags
+- ✅ PyInstaller gera executável único
+- ✅ Sem necessidade de Python no cliente
+- ✅ Inclui ChromeDriver automático
 
 ---
 
@@ -97,14 +100,19 @@ Depois faça commit e push.
 
 ---
 
-## ⚙️ Testando localmente (Windows)
+## ⚙️ Build Local (Opcional)
 
 ```bash
 # Instalar dependências
-pip install beautifulsoup4 openpyxl selenium webdriver-manager pyinstaller pyarmor
+pip install beautifulsoup4 openpyxl selenium webdriver-manager pyinstaller
 
-# Build local
-build.bat
+# Build com PyInstaller
+pyinstaller --onefile --name "ExtractOdds" \
+  --hidden-import=selenium \
+  --hidden-import=webdriver_manager \
+  --hidden-import=bs4 \
+  --hidden-import=openpyxl \
+  extract_odds.py
 
 # Executável estará em: dist/ExtractOdds.exe
 ```
