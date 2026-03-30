@@ -204,12 +204,11 @@ def capturar_html_selenium(driver):
         return None
 
 
-def escolher_mercado(driver):
+def obter_escolha_mercado():
     """
-    Exibe menu de mercados e seleciona o desejado.
+    Exibe menu de mercados e retorna o mercado selecionado pelo usuário.
+    Não requer Selenium - apenas input do usuário.
     """
-    from selenium.webdriver.support.ui import Select
-    
     mercados = [
         "Resultado Final",
         "Over Gols",
@@ -243,15 +242,21 @@ def escolher_mercado(driver):
             opcao = int(input("Digite o número do mercado desejado: ").strip())
             if 1 <= opcao <= len(mercados):
                 mercado_selecionado = mercados[opcao - 1]
-                print(f"\n✅ Mercado selecionado: {mercado_selecionado}")
-                break
+                print(f"\n✅ Mercado selecionado: {mercado_selecionado}\n")
+                return mercado_selecionado
             else:
                 print("❌ Opção inválida! Digite um número da lista.")
         except ValueError:
             print("❌ Digite um número válido!")
+
+
+def escolher_mercado(driver, mercado_selecionado):
+    """
+    Aplica a seleção de mercado via Selenium usando a escolha do usuário.
+    """
+    from selenium.webdriver.support.ui import Select
     
-    # Selecionar o mercado no select do Selenium
-    print(f"🔄 Aplicando filtro...")
+    print(f"🔄 Aplicando filtro: {mercado_selecionado}...")
     try:
         select_element = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.TAG_NAME, "select"))
@@ -307,9 +312,9 @@ def fazer_login(driver):
         return False
 
 
-def navegar_ate_odds(driver):
+def navegar_ate_odds(driver, mercado_selecionado):
     """
-    Navega até a página de odds do Bet365 e seleciona o mercado.
+    Navega até a página de odds do Bet365 e seleciona o mercado escolhido.
     """
     try:
         print("\n🎯 Navegando até Bet365...")
@@ -348,10 +353,8 @@ def navegar_ate_odds(driver):
             EC.presence_of_element_located((By.CLASS_NAME, "br-tb"))
         )
         
-        # Selecionar mercado ANTES de raspar
-        print("\n" + "=" * 60)
-        escolher_mercado(driver)
-        print("=" * 60)
+        # Aplicar seleção de mercado
+        escolher_mercado(driver, mercado_selecionado)
         
         print("✓ Navegação concluída! Mercado selecionado.")
         return True
@@ -384,8 +387,11 @@ def main():
     
     print(f"✓ Arquivo será salvo como: {nome_arquivo}")
     
+    # Obter escolha de mercado ANTES de inicializar o driver
+    mercado_selecionado = obter_escolha_mercado()
+    
     # Inicializar Selenium
-    print("\n🌐 Iniciando navegador Chrome...")
+    print("🌐 Iniciando navegador Chrome...")
     try:
         # Usar webdriver_manager para instalar/atualizar ChromeDriver automaticamente
         service = Service(ChromeDriverManager().install())
@@ -407,8 +413,8 @@ def main():
             driver.quit()
             return
         
-        # Navegar até odds (inclui seleção de mercado)
-        if not navegar_ate_odds(driver):
+        # Navegar até odds com mercado pré-selecionado
+        if not navegar_ate_odds(driver, mercado_selecionado):
             driver.quit()
             return
         
