@@ -125,6 +125,63 @@ def agregar_odds(odds_data):
     return dados_planilha
 
 
+def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
+    """
+    Adiciona uma nova aba (sheet) ao workbook com dados formatados.
+    """
+    # Criar nova aba com o nome do mercado
+    ws = workbook.create_sheet(title=nome_sheet)
+    
+    # Definir estilos
+    header_fill = PatternFill(start_color="0f273d", end_color="0f273d", fill_type="solid")
+    header_font = Font(color="FFFFFF", bold=True)
+    header_alignment = Alignment(horizontal='center', vertical='center')
+    
+    verde_fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+    vermelho_fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
+    
+    center_alignment = Alignment(horizontal='center', vertical='center')
+    
+    # Cabeçalho
+    headers = ['Odd', 'Verde', 'Vermelho', 'Total']
+    for col_idx, header in enumerate(headers, 1):
+        cell = ws.cell(row=1, column=col_idx)
+        cell.value = header
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = header_alignment
+    
+    # Dados
+    for row_idx, item in enumerate(dados_planilha, 2):
+        # Coluna Odd
+        cell = ws.cell(row=row_idx, column=1)
+        cell.value = item['Odd']
+        cell.alignment = center_alignment
+        
+        # Coluna Verde
+        cell = ws.cell(row=row_idx, column=2)
+        cell.value = item['Verde']
+        cell.fill = verde_fill
+        cell.alignment = center_alignment
+        
+        # Coluna Vermelho
+        cell = ws.cell(row=row_idx, column=3)
+        cell.value = item['Vermelho']
+        cell.fill = vermelho_fill
+        cell.alignment = center_alignment
+        
+        # Coluna Total
+        cell = ws.cell(row=row_idx, column=4)
+        cell.value = item['Total']
+        cell.alignment = center_alignment
+    
+    # Ajustar largura das colunas
+    ws.column_dimensions['A'].width = 12
+    ws.column_dimensions['B'].width = 12
+    ws.column_dimensions['C'].width = 12
+    ws.column_dimensions['D'].width = 10
+
+
 def criar_excel(dados_planilha, nome_arquivo):
     """
     Cria workbook Excel com dados formatados e salva.
@@ -366,7 +423,7 @@ def navegar_ate_odds(driver, mercado_selecionado):
 
 def main():
     """
-    Função principal - fluxo automatizado completo.
+    Função principal - fluxo automatizado completo com loop para múltiplos mercados em um único arquivo.
     """
     # Verificar licença primeiro
     verificar_licenca()
@@ -376,7 +433,7 @@ def main():
     print(" UltraVirtual → Bet365 → Placar FT → Odds")
     print("=" * 60)
     
-    # Pedir nome do arquivo
+    # Pedir nome do arquivo UMA VEZ
     while True:
         nome_arquivo = input("\n📝 Digite o nome do arquivo de saída (ex: resultado.xlsx): ").strip()
         if nome_arquivo:
@@ -387,13 +444,13 @@ def main():
     
     print(f"✓ Arquivo será salvo como: {nome_arquivo}")
     
-    # Obter escolha de mercado ANTES de inicializar o driver
-    mercado_selecionado = obter_escolha_mercado()
+    # Criar workbook UMA VEZ (será reutilizado para todas as abas)
+    workbook = Workbook()
+    primeira_aba = True  # Flag para remover aba padrão na primeira iteração
     
-    # Inicializar Selenium
-    print("🌐 Iniciando navegador Chrome...")
+    # Inicializar Selenium UMA VEZ
+    print("\n🌐 Iniciando navegador Chrome...")
     try:
-        # Usar webdriver_manager para instalar/atualizar ChromeDriver automaticamente
         service = Service(ChromeDriverManager().install())
         driver = webdriver.Chrome(service=service)
         print("✓ Chrome iniciado!")
@@ -408,76 +465,114 @@ def main():
         driver.get("https://ultravirtual.com.br/")
         time.sleep(2)
         
-        # Fazer login
+        # Fazer login UMA VEZ
         if not fazer_login(driver):
             driver.quit()
             return
         
-        # Navegar até odds com mercado pré-selecionado
-        if not navegar_ate_odds(driver, mercado_selecionado):
-            driver.quit()
-            return
-        
-        # Capturar HTML
-        print("\n📥 Capturando HTML do grid...")
-        html_grid = capturar_html_selenium(driver)
-        
-        if not html_grid:
-            print("❌ Falha ao capturar HTML!")
-            driver.quit()
-            return
-        
-        print(f"✓ HTML capturado ({len(html_grid)} caracteres)")
-        
+        # Loop para extrair múltiplos mercados
+        while True:
+            # Obter escolha de mercado
+            mercado_selecionado = obter_escolha_mercado()
+            
+            # Navegar até odds com mercado pré-selecionado
+            if not navegar_ate_odds(driver, mercado_selecionado):
+                break
+            
+            # Capturar HTML
+            print("\n📥 Capturando HTML do grid...")
+            html_grid = capturar_html_selenium(driver)
+            
+            if not html_grid:
+                print("❌ Falha ao capturar HTML!")
+                break
+            
+            print(f"✓ HTML capturado ({len(html_grid)} caracteres)")
+            
+            # Processar dados
+            print("\n" + "=" * 60)
+            print(" PROCESSANDO DADOS")
+            print("=" * 60)
+            
+            print(f"\n🔍 Extraindo odds...")
+            odds_data = extrair_odds_do_html(html_grid)
+            print(f"✓ {len(odds_data)} odds extraídas")
+            
+            if not odds_data:
+                print("❌ Nenhuma odd foi encontrada!")
+                continue
+            
+            print(f"\n📊 Agregando odds...")
+            dados_planilha = agregar_odds(odds_data)
+            print(f"✓ {len(dados_planilha)} odds únicas identificadas")
+            
+            # Estatísticas
+            total_ocorrencias = len(odds_data)
+            total_verde = sum(item['Verde'] for item in dados_planilha)
+            total_vermelho = sum(item['Vermelho'] for item in dados_planilha)
+            
+            print(f"\n📈 ESTATÍSTICAS:")
+            print(f"   • Odds únicas: {len(dados_planilha)}")
+            print(f"   • Total de ocorrências: {total_ocorrencias}")
+            print(f"   • Verde (ganhos): {total_verde} ({100*total_verde/total_ocorrencias:.1f}%)")
+            print(f"   • Vermelho (perdas): {total_vermelho} ({100*total_vermelho/total_ocorrencias:.1f}%)")
+            
+            # Adicionar nova aba ao workbook
+            print(f"\n💾 Adicionando aba: {mercado_selecionado}...")
+            
+            # Remover aba padrão na primeira iteração
+            if primeira_aba:
+                # Remover a aba padrão "Sheet"
+                if 'Sheet' in workbook.sheetnames:
+                    del workbook['Sheet']
+                primeira_aba = False
+            
+            # Adicionar dados como nova aba
+            adicionar_sheet_excel(workbook, dados_planilha, mercado_selecionado)
+            print(f"✅ Aba adicionada: {mercado_selecionado}")
+            
+            # Mostrar amostra
+            print(f"\n📋 AMOSTRA DOS DADOS (primeiras 10 linhas):")
+            print(f"{'Odd':<8} {'Verde':<10} {'Vermelho':<12} {'Total':<8}")
+            print("-" * 40)
+            for item in dados_planilha[:10]:
+                print(f"{item['Odd']:<8} {item['Verde']:<10} {item['Vermelho']:<12} {item['Total']:<8}")
+            
+            if len(dados_planilha) > 10:
+                print(f"... e mais {len(dados_planilha) - 10} linhas")
+            
+            print("\n✨ Mercado processado com sucesso!")
+            
+            # Perguntar se quer outro mercado
+            print("\n" + "=" * 60)
+            while True:
+                resposta = input("Deseja extrair odds de outro mercado? (s/n): ").strip().lower()
+                if resposta in ['s', 'sim', 'n', 'não', 'nao']:
+                    break
+                print("❌ Digite 's' para SIM ou 'n' para NÃO")
+            
+            if resposta in ['n', 'não', 'nao']:
+                print("\n🏁 Encerrando aplicação...")
+                break
+            
     finally:
         print("\n🔒 Fechando navegador...")
         driver.quit()
     
-    # Processar dados
-    print("\n" + "=" * 60)
-    print(" PROCESSANDO DADOS")
+    # Salvar workbook APENAS uma vez, no final
+    print("\n📊 Salvando arquivo com todas as abas...")
+    try:
+        workbook.save(nome_arquivo)
+        print(f"✅ Arquivo salvo com sucesso: {nome_arquivo}")
+        print(f"   Abas criadas: {', '.join(workbook.sheetnames)}")
+    except Exception as e:
+        print(f"❌ Erro ao salvar arquivo: {e}")
+    
+    print("\n✨ Processo finalizado!")
     print("=" * 60)
-    
-    print(f"\n🔍 Extraindo odds...")
-    odds_data = extrair_odds_do_html(html_grid)
-    print(f"✓ {len(odds_data)} odds extraídas")
-    
-    if not odds_data:
-        print("❌ Nenhuma odd foi encontrada!")
-        return
-    
-    print(f"\n📊 Agregando odds...")
-    dados_planilha = agregar_odds(odds_data)
-    print(f"✓ {len(dados_planilha)} odds únicas identificadas")
-    
-    # Estatísticas
-    total_ocorrencias = len(odds_data)
-    total_verde = sum(item['Verde'] for item in dados_planilha)
-    total_vermelho = sum(item['Vermelho'] for item in dados_planilha)
-    
-    print(f"\n📈 ESTATÍSTICAS:")
-    print(f"   • Odds únicas: {len(dados_planilha)}")
-    print(f"   • Total de ocorrências: {total_ocorrencias}")
-    print(f"   • Verde (ganhos): {total_verde} ({100*total_verde/total_ocorrencias:.1f}%)")
-    print(f"   • Vermelho (perdas): {total_vermelho} ({100*total_vermelho/total_ocorrencias:.1f}%)")
-    
-    # Gerar Excel
-    print(f"\n💾 Gerando arquivo Excel...")
-    arquivo_salvo = criar_excel(dados_planilha, nome_arquivo)
-    print(f"✅ Arquivo salvo com sucesso: {arquivo_salvo}")
-    
-    # Mostrar amostra
-    print(f"\n📋 AMOSTRA DOS DADOS (primeiras 10 linhas):")
-    print(f"{'Odd':<8} {'Verde':<10} {'Vermelho':<12} {'Total':<8}")
-    print("-" * 40)
-    for item in dados_planilha[:10]:
-        print(f"{item['Odd']:<8} {item['Verde']:<10} {item['Vermelho']:<12} {item['Total']:<8}")
-    
-    if len(dados_planilha) > 10:
-        print(f"... e mais {len(dados_planilha) - 10} linhas")
-    
-    print("\n✨ Processo concluído com sucesso!")
-    print("=" * 60)
+
+
+
 
 
 if __name__ == "__main__":
