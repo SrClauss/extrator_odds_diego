@@ -9,6 +9,8 @@ import time
 import subprocess
 import sys
 import unicodedata
+import threading
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
 from collections import defaultdict
 
@@ -560,89 +562,129 @@ def extrair_competicao(driver, workbook, competicao_url):
     clicar_botao_e_extrair(driver, workbook, "Ambas Sim", "Ambas Sim")
 
 
-def main():
-    """
-    Função principal - raspa todas as competições disponíveis no Bet365,
-    criando um arquivo Excel separado para cada uma.
-    Formato do arquivo: {slug_competicao}_{timestamp}.xlsx
-    """
-    print("=" * 60)
-    print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
-    print(" UltraVirtual → Bet365 → Todas as Competições")
-    print("=" * 60)
+# Lock global para serializar prints e evitar saída embaralhada
+_print_lock = threading.Lock()
 
-    timestamp = datetime.now().strftime("%d%m%Y_%H%M")
 
-    # Inicializar Selenium
-    print("\n🌐 Iniciando navegador Chrome...")
+def log(nome_comp, msg):
+    """Print thread-safe prefixado com o nome da competição."""
+    with _print_lock:
+        print(f"[{nome_comp}] {msg}")
+
+
+def processar_competicao(competicao, timestamp, driver_path):
+    """
+    Processa uma única competição de forma autossuficiente:
+    abre o próprio Chrome, loga, navega, extrai e salva o Excel.
+    Retorna (nome_arquivo, None) em sucesso ou (None, motivo_erro).
+    """
+    nome_comp = competicao['nome']
+    url_comp  = competicao['url']
+    slug      = sanitizar_nome(nome_comp)
+    nome_arquivo = f"{slug}_{timestamp}.xlsx"
+
+    log(nome_comp, "🌐 Iniciando Chrome...")
     try:
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service)
-        print("✓ Chrome iniciado!")
+        service = Service(driver_path)
+        driver  = webdriver.Chrome(service=service)
     except Exception as e:
-        print(f"❌ Erro ao iniciar Chrome: {e}")
-        print("💡 Certifique-se de ter o Google Chrome instalado")
-        return
-
-    arquivos_salvos = []
+        return None, f"Erro ao iniciar Chrome: {e}"
 
     try:
-        # Abrir site e fazer login
-        print("\n🔗 Acessando UltraVirtual...")
+        log(nome_comp, "🔗 Acessando UltraVirtual...")
         driver.get("https://ultravirtual.com.br/")
         time.sleep(2)
 
         if not fazer_login(driver):
-            return
+            return None, "Falha no login"
 
-        competicoes = listar_competicoes()
-        print(f"\n📋 Competições a processar: {[c['nome'] for c in competicoes]}")
+        log(nome_comp, f"🎯 Navegando para {url_comp}")
+        if not navegar_ate_odds(driver, url=url_comp):
+            return None, "Falha na navegação"
 
-        for idx, competicao in enumerate(competicoes, 1):
-            nome_comp = competicao['nome']
-            url_comp = competicao['url']
-            slug = sanitizar_nome(nome_comp)
-            nome_arquivo = f"{slug}_{timestamp}.xlsx"
+        workbook = Workbook()
+        if 'Sheet' in workbook.sheetnames:
+            del workbook['Sheet']
 
-            print("\n" + "#" * 60)
-            print(f" [{idx}/{len(competicoes)}] {nome_comp}")
-            print(f" Arquivo: {nome_arquivo}")
-            print("#" * 60)
+        extrair_competicao(driver, workbook, url_comp)
 
-            if not navegar_ate_odds(driver, url=url_comp):
-                print(f"⚠️  Pulando competição: {nome_comp}")
-                continue
+        if not workbook.sheetnames:
+            return None, "Nenhuma aba gerada"
 
-            workbook = Workbook()
-            if 'Sheet' in workbook.sheetnames:
-                del workbook['Sheet']
-
-            extrair_competicao(driver, workbook, url_comp)
-
-            if workbook.sheetnames:
-                try:
-                    workbook.save(nome_arquivo)
-                    arquivos_salvos.append(nome_arquivo)
-                    print(f"✅ Arquivo salvo: {nome_arquivo}  (abas: {', '.join(workbook.sheetnames)})")
-                except Exception as e:
-                    print(f"❌ Erro ao salvar {nome_arquivo}: {e}")
-            else:
-                print(f"⚠️  Nenhuma aba gerada para '{nome_comp}', arquivo não salvo.")
+        workbook.save(nome_arquivo)
+        log(nome_comp, f"✅ Salvo: {nome_arquivo}  (abas: {', '.join(workbook.sheetnames)})")
+        return nome_arquivo, None
 
     except Exception as e:
-        print(f"❌ Erro inesperado: {e}")
+        return None, str(e)
     finally:
-        print("\n🔒 Fechando navegador...")
-        driver.quit()
+        try:
+            driver.quit()
+        except Exception:
+            pass
+
+
+def main():
+    """
+    Função principal — raspa todas as competições em PARALELO,
+    cada uma com seu próprio Chrome. Um arquivo Excel por competição.
+    Formato: {slug_competicao}_{timestamp}.xlsx
+    """
+    print("=" * 60)
+    print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
+    print(" UltraVirtual → Bet365 → Todas as Competições (PARALELO)")
+    print("=" * 60)
+
+    timestamp   = datetime.now().strftime("%d%m%Y_%H%M")
+    competicoes = listar_competicoes()
+
+    print(f"\n📋 Competições: {[c['nome'] for c in competicoes]}")
+    print(f"🚀 Iniciando {len(competicoes)} janelas em paralelo...\n")
+
+    # Resolve o driver uma vez (evita race condition no download)
+    print("🔧 Verificando ChromeDriver...")
+    try:
+        driver_path = ChromeDriverManager().install()
+        print(f"✓ ChromeDriver pronto: {driver_path}")
+    except Exception as e:
+        print(f"❌ Erro ao obter ChromeDriver: {e}")
+        return
+
+    arquivos_salvos = []
+    erros           = []
+
+    with ThreadPoolExecutor(max_workers=len(competicoes)) as executor:
+        futures = {
+            executor.submit(processar_competicao, comp, timestamp, driver_path): comp['nome']
+            for comp in competicoes
+        }
+        for future in as_completed(futures):
+            nome = futures[future]
+            try:
+                arquivo, erro = future.result()
+                if arquivo:
+                    arquivos_salvos.append(arquivo)
+                else:
+                    erros.append((nome, erro))
+                    with _print_lock:
+                        print(f"⚠️  [{nome}] Falhou: {erro}")
+            except Exception as e:
+                erros.append((nome, str(e)))
+                with _print_lock:
+                    print(f"❌ [{nome}] Exceção: {e}")
 
     print("\n" + "=" * 60)
     print(" RESUMO FINAL")
     print("=" * 60)
     if arquivos_salvos:
         print(f"✨ {len(arquivos_salvos)} arquivo(s) gerado(s):")
-        for arq in arquivos_salvos:
+        for arq in sorted(arquivos_salvos):
             print(f"   • {arq}")
-    else:
+    if erros:
+        print(f"\n⚠️  {len(erros)} competição(ões) com erro:")
+        for nome, motivo in erros:
+            print(f"   • {nome}: {motivo}")
+    if not arquivos_salvos and not erros:
         print("⚠️  Nenhum arquivo foi gerado.")
     print("=" * 60)
 
