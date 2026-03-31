@@ -9,8 +9,7 @@ import time
 import subprocess
 import sys
 import unicodedata
-import threading
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from datetime import datetime
 from collections import defaultdict
 
@@ -562,14 +561,13 @@ def extrair_competicao(driver, workbook, competicao_url):
     clicar_botao_e_extrair(driver, workbook, "Ambas Sim", "Ambas Sim")
 
 
-# Lock global para serializar prints e evitar saída embaralhada
-_print_lock = threading.Lock()
-
+# ─────────────────────────────────────────────────────────────
+# Cada processo tem sua própria saída; print simples é suficiente
+# ─────────────────────────────────────────────────────────────
 
 def log(nome_comp, msg):
-    """Print thread-safe prefixado com o nome da competição."""
-    with _print_lock:
-        print(f"[{nome_comp}] {msg}")
+    """Print prefixado com o nome da competição."""
+    print(f"[{nome_comp}] {msg}", flush=True)
 
 
 def processar_competicao(competicao, timestamp, driver_path):
@@ -653,7 +651,7 @@ def main():
     arquivos_salvos = []
     erros           = []
 
-    with ThreadPoolExecutor(max_workers=len(competicoes)) as executor:
+    with ProcessPoolExecutor(max_workers=len(competicoes)) as executor:
         futures = {
             executor.submit(processar_competicao, comp, timestamp, driver_path): comp['nome']
             for comp in competicoes
@@ -666,12 +664,10 @@ def main():
                     arquivos_salvos.append(arquivo)
                 else:
                     erros.append((nome, erro))
-                    with _print_lock:
-                        print(f"⚠️  [{nome}] Falhou: {erro}")
+                    print(f"⚠️  [{nome}] Falhou: {erro}")
             except Exception as e:
                 erros.append((nome, str(e)))
-                with _print_lock:
-                    print(f"❌ [{nome}] Exceção: {e}")
+                print(f"❌ [{nome}] Exceção: {e}")
 
     print("\n" + "=" * 60)
     print(" RESUMO FINAL")
