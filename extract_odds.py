@@ -413,36 +413,47 @@ def navegar_ate_odds(driver, url=None):
 
         # Ir direto para a URL da competição
         driver.get(url)
-        time.sleep(2)
+        time.sleep(4)  # tempo extra para a página renderizar
 
         # Clicar em Placar FT
         print("📊 Abrindo Placar FT...")
-        placarFT_button_span = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Placar FT')]"))
-        )
-        placarFT_button_span.click()
-        time.sleep(1)
+        try:
+            placarFT_button_span = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Placar FT')]"))
+            )
+            placarFT_button_span.click()
+            time.sleep(2)
+        except Exception as e:
+            print(f"⚠️  Botão 'Placar FT' não encontrado: {e}")
+            print("   Continuando sem clicar em Placar FT...")
 
         # Clicar em Odds
         print("💰 Abrindo grid de Odds...")
-        odds_button_span = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Odds')]"))
-        )
-        odds_button_span.click()
+        try:
+            odds_button_span = WebDriverWait(driver, 20).until(
+                EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Odds')]"))
+            )
+            odds_button_span.click()
+        except Exception as e:
+            print(f"⚠️  Botão 'Odds' não encontrado: {e}")
+            print("   Continuando sem clicar em Odds...")
 
         print("⏳ Aguardando odds carregarem completamente...")
         time.sleep(5)
 
-        # Aguardar até o grid estar presente
-        WebDriverWait(driver, 15).until(
-            EC.presence_of_element_located((By.CLASS_NAME, "br-tb"))
-        )
+        # Aguardar até o grid estar presente (não-fatal)
+        try:
+            WebDriverWait(driver, 20).until(
+                EC.presence_of_element_located((By.CLASS_NAME, "br-tb"))
+            )
+        except Exception:
+            print("⚠️  Grid 'br-tb' não detectado no tempo limite — tentando extrair assim mesmo...")
 
         print("✓ Navegação concluída!")
         return True
 
     except Exception as e:
-        print(f"❌ Erro na navegação: {e}")
+        print(f"❌ Erro fatal na navegação: {e}")
         return False
 
 
