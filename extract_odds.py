@@ -11,26 +11,25 @@ import sys
 from datetime import datetime
 from collections import defaultdict
 
-# Verificação de licença - expira em 31/03/2026
+# ─── LICENÇA ─────────────────────────────────────────────────
 DATA_EXPIRACAO = datetime(2026, 3, 31, 23, 59, 59)
 
 def verificar_licenca():
-    """Verifica se a licença está válida"""
+    """Encerra o programa se a licença estiver expirada."""
     agora = datetime.now()
     if agora > DATA_EXPIRACAO:
         print("\n" + "=" * 60)
-        print("⚠️  LICENÇA EXPIRADA")
+        print("  LICENÇA EXPIRADA")
         print("=" * 60)
-        print(f"\nEste software expirou em: {DATA_EXPIRACAO.strftime('%d/%m/%Y')}")
-        print(f"Data atual: {agora.strftime('%d/%m/%Y')}")
-        print("\n💡 Entre em contato para renovar sua licença.")
+        print(f"  Expirou em : {DATA_EXPIRACAO.strftime('%d/%m/%Y %H:%M')}")
+        print(f"  Data atual : {agora.strftime('%d/%m/%Y %H:%M')}")
+        print("  Entre em contato para renovar sua licença.")
         print("=" * 60 + "\n")
-        input("Pressione ENTER para sair...")
         sys.exit(1)
-    
-    dias_restantes = (DATA_EXPIRACAO - agora).days
-    if dias_restantes <= 7:
-        print(f"\n⚠️  Atenção: Licença expira em {dias_restantes} dias ({DATA_EXPIRACAO.strftime('%d/%m/%Y')})\n")
+    dias = (DATA_EXPIRACAO - agora).days
+    if dias <= 7:
+        print(f"\n  Atenção: licença expira em {dias} dia(s) ({DATA_EXPIRACAO.strftime('%d/%m/%Y')})\n")
+# ─────────────────────────────────────────────────────────────
 
 # Função para instalar pacotes caso não existam
 def instalar_se_necessario(pacote, import_name=None):
@@ -64,38 +63,40 @@ def extrair_odds_do_html(html_source):
     """
     Extrai odds do HTML fornecido.
     Retorna lista de dicts com 'odd' e 'cor'.
+    Busca apenas divs com classe br-tb e background verde (#28a745) ou vermelho (#dc3545).
+    O valor da odd está no div interno com color: rgb(255, 215, 0).
     """
     soup = BeautifulSoup(html_source, 'html.parser')
     odds_data = []
-    
-    # Encontrar todos os divs com classe br-tb e cor de fundo
-    all_divs = soup.find_all('div', recursive=True)
-    
-    for div in all_divs:
-        style = div.get('style', '')
-        
-        # Verificar se tem cor de fundo
-        if 'background-color' not in style:
-            continue
+
+    # Buscar apenas as células do grid (classe br-tb)
+    celulas = soup.find_all('div', class_='br-tb')
+
+    for celula in celulas:
+        style = celula.get('style', '')
+
+        # Apenas células verdes ou vermelhas
         if '#dc3545' not in style and '#28a745' not in style:
             continue
-        
+
         cor = 'Vermelho' if '#dc3545' in style else 'Verde'
-        
-        # Procurar texto com a odd
-        text_content = div.get_text(strip=True)
-        
-        # Verificar se contém número com ponto (é uma odd)
-        if text_content and '.' in text_content:
-            # Extrair apenas a parte numérica
-            match = re.search(r'\d+\.?\d*', text_content)
-            if match:
-                odd_value = match.group()
-                odds_data.append({
-                    'odd': odd_value,
-                    'cor': cor
-                })
-    
+
+        # O valor da odd fica no div interno com cor dourada
+        div_valor = celula.find('div', style=lambda s: s and 'color: rgb(255, 215, 0)' in s)
+        if not div_valor:
+            continue
+
+        text_content = div_valor.get_text(strip=True)
+        if not text_content:
+            continue
+
+        match = re.search(r'\d+\.?\d*', text_content)
+        if match:
+            odds_data.append({
+                'odd': match.group(),
+                'cor': cor
+            })
+
     return odds_data
 
 
@@ -143,43 +144,65 @@ def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
     center_alignment = Alignment(horizontal='center', vertical='center')
     
     # Cabeçalho
-    headers = ['Odd', 'Verde', 'Vermelho', 'Total']
+    headers = ['Odd', 'Verde', 'Vermelho', 'Total', 'Odd Real', 'Teórica', 'Real - Teórica']
     for col_idx, header in enumerate(headers, 1):
         cell = ws.cell(row=1, column=col_idx)
         cell.value = header
         cell.fill = header_fill
         cell.font = header_font
         cell.alignment = header_alignment
-    
+
     # Dados
     for row_idx, item in enumerate(dados_planilha, 2):
-        # Coluna Odd
+        # Coluna Odd (numérico, formato sem zeros desnecessários)
         cell = ws.cell(row=row_idx, column=1)
-        cell.value = item['Odd']
+        cell.value = float(item['Odd'])
+        cell.number_format = '0.##'
         cell.alignment = center_alignment
-        
+
         # Coluna Verde
         cell = ws.cell(row=row_idx, column=2)
         cell.value = item['Verde']
         cell.fill = verde_fill
         cell.alignment = center_alignment
-        
+
         # Coluna Vermelho
         cell = ws.cell(row=row_idx, column=3)
         cell.value = item['Vermelho']
         cell.fill = vermelho_fill
         cell.alignment = center_alignment
-        
+
         # Coluna Total
         cell = ws.cell(row=row_idx, column=4)
         cell.value = item['Total']
         cell.alignment = center_alignment
-    
+
+        # Coluna Odd Real = Verde / Total
+        cell = ws.cell(row=row_idx, column=5)
+        cell.value = f'=IFERROR(B{row_idx}/D{row_idx},0)'
+        cell.number_format = '0.00%'
+        cell.alignment = center_alignment
+
+        # Coluna Teórica = 1 / Odd
+        cell = ws.cell(row=row_idx, column=6)
+        cell.value = f'=1/A{row_idx}'
+        cell.number_format = '0.00%'
+        cell.alignment = center_alignment
+
+        # Coluna Real - Teórica
+        cell = ws.cell(row=row_idx, column=7)
+        cell.value = f'=E{row_idx}-F{row_idx}'
+        cell.number_format = '0.00%'
+        cell.alignment = center_alignment
+
     # Ajustar largura das colunas
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 12
     ws.column_dimensions['C'].width = 12
     ws.column_dimensions['D'].width = 10
+    ws.column_dimensions['E'].width = 14
+    ws.column_dimensions['F'].width = 12
+    ws.column_dimensions['G'].width = 16
 
 
 def criar_excel(dados_planilha, nome_arquivo):
@@ -369,24 +392,24 @@ def fazer_login(driver):
         return False
 
 
-def navegar_ate_odds(driver, mercado_selecionado):
+def navegar_ate_odds(driver):
     """
-    Navega até a página de odds do Bet365 e seleciona o mercado escolhido.
+    Navega até a página de odds do Bet365 (Placar FT → Odds) e aguarda o grid carregar.
     """
     try:
         print("\n🎯 Navegando até Bet365...")
-        
+
         # Clicar em Bet365
         span_bet365 = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//*[text()='Bet365']"))
         )
         span_bet365.click()
         time.sleep(1)
-        
+
         # Ir direto para a URL
         driver.get("https://ultravirtual.com.br/dashboard/bet365/world/hourly")
         time.sleep(2)
-        
+
         # Clicar em Placar FT
         print("📊 Abrindo Placar FT...")
         placarFT_button_span = WebDriverWait(driver, 10).until(
@@ -394,64 +417,124 @@ def navegar_ate_odds(driver, mercado_selecionado):
         )
         placarFT_button_span.click()
         time.sleep(1)
-        
+
         # Clicar em Odds
         print("💰 Abrindo grid de Odds...")
         odds_button_span = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Odds')]"))
         )
         odds_button_span.click()
-        
+
         print("⏳ Aguardando odds carregarem completamente...")
-        time.sleep(5)  # Esperar mais tempo para as odds carregarem
-        
+        time.sleep(5)
+
         # Aguardar até o grid estar presente
         WebDriverWait(driver, 15).until(
             EC.presence_of_element_located((By.CLASS_NAME, "br-tb"))
         )
-        
-        # Aplicar seleção de mercado
-        escolher_mercado(driver, mercado_selecionado)
-        
-        print("✓ Navegação concluída! Mercado selecionado.")
+
+        print("✓ Navegação concluída!")
         return True
-        
+
     except Exception as e:
         print(f"❌ Erro na navegação: {e}")
         return False
 
 
+def clicar_botao_e_extrair(driver, workbook, texto_botao, nome_aba):
+    """
+    Clica em um botão pelo texto, aguarda o grid atualizar,
+    extrai as odds e adiciona uma nova aba ao workbook.
+    """
+    print(f"\n🔘 Clicando em '{texto_botao}'...")
+    try:
+        botao = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, f"//button[contains(text(), '{texto_botao}')]"))
+        )
+        botao.click()
+        time.sleep(3)
+        print(f"✓ Botão '{texto_botao}' clicado!")
+    except Exception as e:
+        print(f"❌ Erro ao clicar no botão '{texto_botao}': {e}")
+        return
+
+    # Navegar para visualização 72 Horas/Linhas → Células
+    try:
+        print("🔀 Selecionando visualização 72 Horas/Linhas...")
+        linhas = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Linhas')]"))
+        )
+        linhas.click()
+        time.sleep(1)
+
+        select2_element = WebDriverWait(driver, 10).until(
+            EC.presence_of_element_located((By.TAG_NAME, "select"))
+        )
+        from selenium.webdriver.support.ui import Select as _Select
+        select2_ = _Select(select2_element)
+        select2_.select_by_visible_text("72 Horas/Linhas")
+        time.sleep(1)
+
+        celulas = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Células')]"))
+        )
+        celulas.click()
+        time.sleep(2)
+        print("✓ Visualização 72 Horas/Linhas → Células aplicada!")
+    except Exception as e:
+        print(f"⚠️  Erro ao aplicar visualização Linhas/Células: {e}")
+
+    # Capturar HTML
+    print("📥 Capturando HTML do grid...")
+    html_grid = capturar_html_selenium(driver)
+    if not html_grid:
+        print("❌ Falha ao capturar HTML!")
+        return
+
+    # Extrair e agregar
+    odds_data = extrair_odds_do_html(html_grid)
+    print(f"✓ {len(odds_data)} odds extraídas")
+
+    if not odds_data:
+        print(f"⚠️  Nenhuma odd encontrada para '{nome_aba}', aba não será criada.")
+        return
+
+    dados_planilha = agregar_odds(odds_data)
+
+    total_ocorrencias = len(odds_data)
+    total_verde = sum(item['Verde'] for item in dados_planilha)
+    total_vermelho = sum(item['Vermelho'] for item in dados_planilha)
+    print(f"📈 {len(dados_planilha)} odds únicas | Verde: {total_verde} | Vermelho: {total_vermelho} | Total: {total_ocorrencias}")
+
+    # Adicionar aba ao workbook
+    adicionar_sheet_excel(workbook, dados_planilha, nome_aba)
+    print(f"✅ Aba adicionada: '{nome_aba}'")
+
+
 def main():
     """
-    Função principal - fluxo automatizado completo com loop para múltiplos mercados em um único arquivo.
+    Função principal - fluxo automático sem interação:
+    Extrai Over 2.5, Over 3.5 (Over Gols) e 5+ gols (Total de Gols Exatos)
+    e salva tudo em um único arquivo Excel com 3 abas.
     """
-    # Verificar licença primeiro
     verificar_licenca()
-    
+
     print("=" * 60)
     print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
     print(" UltraVirtual → Bet365 → Placar FT → Odds")
     print("=" * 60)
-    
-    # Pedir nome do arquivo UMA VEZ
-    while True:
-        nome_arquivo = input("\n📝 Digite o nome do arquivo de saída (ex: resultado.xlsx): ").strip()
-        if nome_arquivo:
-            if not nome_arquivo.endswith('.xlsx'):
-                nome_arquivo += '.xlsx'
-            break
-        print("⚠️  Nome do arquivo não pode estar vazio!")
-    
-    print(f"✓ Arquivo será salvo como: {nome_arquivo}")
-    
-    # Pedir PRIMEIRA opção de mercado ANTES de abrir o driver
-    mercado_selecionado = obter_escolha_mercado()
-    
-    # Criar workbook UMA VEZ (será reutilizado para todas as abas)
+
+    # Gerar nome do arquivo automaticamente com timestamp
+    timestamp = datetime.now().strftime("%d%m%Y_%H%M")
+    nome_arquivo = f"odds_{timestamp}.xlsx"
+    print(f"\n✓ Arquivo será salvo como: {nome_arquivo}")
+
+    # Criar workbook e remover aba padrão
     workbook = Workbook()
-    primeira_aba = True  # Flag para remover aba padrão na primeira iteração
-    
-    # Inicializar Selenium UMA VEZ
+    if 'Sheet' in workbook.sheetnames:
+        del workbook['Sheet']
+
+    # Inicializar Selenium
     print("\n🌐 Iniciando navegador Chrome...")
     try:
         service = Service(ChromeDriverManager().install())
@@ -461,130 +544,64 @@ def main():
         print(f"❌ Erro ao iniciar Chrome: {e}")
         print("💡 Certifique-se de ter o Google Chrome instalado")
         return
-    
+
     try:
-        # Abrir site
+        # Abrir site e fazer login
         print("\n🔗 Acessando UltraVirtual...")
         driver.get("https://ultravirtual.com.br/")
         time.sleep(2)
-        
-        # Fazer login UMA VEZ
+
         if not fazer_login(driver):
             driver.quit()
             return
-        
-        # Loop para extrair múltiplos mercados - começando com a PRIMEIRA opção
-        while True:
-            # Navegar até odds com mercado pré-selecionado
-            if not navegar_ate_odds(driver, mercado_selecionado):
-                break
-            
-            # Capturar HTML
-            print("\n📥 Capturando HTML do grid...")
-            html_grid = capturar_html_selenium(driver)
-            
-            if not html_grid:
-                print("❌ Falha ao capturar HTML!")
-                break
-            
-            print(f"✓ HTML capturado ({len(html_grid)} caracteres)")
-            
-            # Processar dados
-            print("\n" + "=" * 60)
-            print(" PROCESSANDO DADOS")
-            print("=" * 60)
-            
-            print(f"\n🔍 Extraindo odds...")
-            odds_data = extrair_odds_do_html(html_grid)
-            print(f"✓ {len(odds_data)} odds extraídas")
-            
-            if not odds_data:
-                print("❌ Nenhuma odd foi encontrada!")
-                # Perguntar se quer tentar outro mercado mesmo com erro
-                print("\n" + "=" * 60)
-                while True:
-                    resposta = input("Deseja extrair odds de outro mercado? (s/n): ").strip().lower()
-                    if resposta in ['s', 'sim', 'n', 'não', 'nao']:
-                        break
-                    print("❌ Digite 's' para SIM ou 'n' para NÃO")
-                
-                if resposta in ['n', 'não', 'nao']:
-                    print("\n🏁 Encerrando aplicação...")
-                    break
-                else:
-                    # Pedir novo mercado
-                    mercado_selecionado = obter_escolha_mercado()
-                    continue
-            
-            print(f"\n📊 Agregando odds...")
-            dados_planilha = agregar_odds(odds_data)
-            print(f"✓ {len(dados_planilha)} odds únicas identificadas")
-            
-            # Estatísticas
-            total_ocorrencias = len(odds_data)
-            total_verde = sum(item['Verde'] for item in dados_planilha)
-            total_vermelho = sum(item['Vermelho'] for item in dados_planilha)
-            
-            print(f"\n📈 ESTATÍSTICAS:")
-            print(f"   • Odds únicas: {len(dados_planilha)}")
-            print(f"   • Total de ocorrências: {total_ocorrencias}")
-            print(f"   • Verde (ganhos): {total_verde} ({100*total_verde/total_ocorrencias:.1f}%)")
-            print(f"   • Vermelho (perdas): {total_vermelho} ({100*total_vermelho/total_ocorrencias:.1f}%)")
-            
-            # Adicionar nova aba ao workbook
-            print(f"\n💾 Adicionando aba: {mercado_selecionado}...")
-            
-            # Remover aba padrão na primeira iteração
-            if primeira_aba:
-                # Remover a aba padrão "Sheet"
-                if 'Sheet' in workbook.sheetnames:
-                    del workbook['Sheet']
-                primeira_aba = False
-            
-            # Adicionar dados como nova aba
-            adicionar_sheet_excel(workbook, dados_planilha, mercado_selecionado)
-            print(f"✅ Aba adicionada: {mercado_selecionado}")
-            
-            # Mostrar amostra
-            print(f"\n📋 AMOSTRA DOS DADOS (primeiras 10 linhas):")
-            print(f"{'Odd':<8} {'Verde':<10} {'Vermelho':<12} {'Total':<8}")
-            print("-" * 40)
-            for item in dados_planilha[:10]:
-                print(f"{item['Odd']:<8} {item['Verde']:<10} {item['Vermelho']:<12} {item['Total']:<8}")
-            
-            if len(dados_planilha) > 10:
-                print(f"... e mais {len(dados_planilha) - 10} linhas")
-            
-            print("\n✨ Mercado processado com sucesso!")
-            
-            # Perguntar se quer outro mercado
-            print("\n" + "=" * 60)
-            while True:
-                resposta = input("Deseja extrair odds de outro mercado? (s/n): ").strip().lower()
-                if resposta in ['s', 'sim', 'n', 'não', 'nao']:
-                    break
-                print("❌ Digite 's' para SIM ou 'n' para NÃO")
-            
-            if resposta in ['n', 'não', 'nao']:
-                print("\n🏁 Encerrando aplicação...")
-                break
-            else:
-                # Pedir novo mercado
-                mercado_selecionado = obter_escolha_mercado()
-            
+
+        # Navegar até Bet365 → Placar FT → Odds
+        if not navegar_ate_odds(driver):
+            driver.quit()
+            return
+
+        # --- Sequência fixa do notebook ---
+
+        # 1) Over Gols → Over 2.5
+        print("\n" + "=" * 60)
+        print(" [1/4] Over Gols → Over 2.5")
+        print("=" * 60)
+        escolher_mercado(driver, "Over Gols")
+        clicar_botao_e_extrair(driver, workbook, "Over 2.5", "Over 2.5")
+
+        # 2) Over Gols → Over 3.5
+        print("\n" + "=" * 60)
+        print(" [2/4] Over Gols → Over 3.5")
+        print("=" * 60)
+        clicar_botao_e_extrair(driver, workbook, "Over 3.5", "Over 3.5")
+
+        # 3) Total de Gols Exatos → 5+ gols
+        print("\n" + "=" * 60)
+        print(" [3/4] Total de Gols Exatos → 5+ gols")
+        print("=" * 60)
+        escolher_mercado(driver, "Total de Gols Exatos")
+        clicar_botao_e_extrair(driver, workbook, "5+ gols", "5+ gols")
+
+        # 4) Para o Time Marcar Sim/Não → Ambas Sim
+        print("\n" + "=" * 60)
+        print(" [4/4] Para o Time Marcar Sim/Não → Ambas Sim")
+        print("=" * 60)
+        escolher_mercado(driver, "Para o Time Marcar Sim/Não")
+        clicar_botao_e_extrair(driver, workbook, "Ambas Sim", "Ambas Sim")
+
     finally:
         print("\n🔒 Fechando navegador...")
         driver.quit()
-    
-    # Salvar workbook APENAS uma vez, no final
-    print("\n📊 Salvando arquivo com todas as abas...")
+
+    # Salvar workbook
+    print("\n📊 Salvando arquivo...")
     try:
         workbook.save(nome_arquivo)
         print(f"✅ Arquivo salvo com sucesso: {nome_arquivo}")
         print(f"   Abas criadas: {', '.join(workbook.sheetnames)}")
     except Exception as e:
         print(f"❌ Erro ao salvar arquivo: {e}")
-    
+
     print("\n✨ Processo finalizado!")
     print("=" * 60)
 
