@@ -6,7 +6,7 @@ echo ============================================
 echo  Atualizando repositorio...
 echo ============================================
 git fetch --all
-git reset --hard origin/main
+git reset --hard origin/master
 if %errorlevel% neq 0 (
     echo ERRO: Falha ao atualizar o repositorio.
     pause
