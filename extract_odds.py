@@ -123,20 +123,41 @@ def sanitizar_nome(nome):
 def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
     """
     Adiciona uma nova aba (sheet) ao workbook com dados formatados.
+    Calcula Odd Real, Teórica e Real-Teórica em Python (sem fórmulas)
+    e ordena por Real-Teórica de forma decrescente.
     """
-    # Criar nova aba com o nome do mercado
+    # Calcular colunas derivadas e ordenar por Real-Teórica decrescente
+    linhas = []
+    for item in dados_planilha:
+        odd      = float(item['Odd'])
+        verde    = item['Verde']
+        total    = item['Total']
+        odd_real = verde / total if total > 0 else 0.0
+        teorica  = 1 / odd if odd > 0 else 0.0
+        real_teo = odd_real - teorica
+        linhas.append({
+            'odd':      odd,
+            'verde':    verde,
+            'vermelho': item['Vermelho'],
+            'total':    total,
+            'odd_real': odd_real,
+            'teorica':  teorica,
+            'real_teo': real_teo,
+        })
+
+    linhas.sort(key=lambda x: x['real_teo'], reverse=True)
+
+    # Criar nova aba
     ws = workbook.create_sheet(title=nome_sheet)
-    
-    # Definir estilos
-    header_fill = PatternFill(start_color="0f273d", end_color="0f273d", fill_type="solid")
-    header_font = Font(color="FFFFFF", bold=True)
+
+    # Estilos
+    header_fill      = PatternFill(start_color="0f273d", end_color="0f273d", fill_type="solid")
+    header_font      = Font(color="FFFFFF", bold=True)
     header_alignment = Alignment(horizontal='center', vertical='center')
-    
-    verde_fill = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
-    vermelho_fill = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
-    
+    verde_fill       = PatternFill(start_color="28a745", end_color="28a745", fill_type="solid")
+    vermelho_fill    = PatternFill(start_color="dc3545", end_color="dc3545", fill_type="solid")
     center_alignment = Alignment(horizontal='center', vertical='center')
-    
+
     # Cabeçalho
     headers = ['Odd', 'Verde', 'Vermelho', 'Total', 'Odd Real', 'Teórica', 'Real - Teórica']
     for col_idx, header in enumerate(headers, 1):
@@ -146,50 +167,43 @@ def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
         cell.font = header_font
         cell.alignment = header_alignment
 
-    # Dados
-    for row_idx, item in enumerate(dados_planilha, 2):
-        # Coluna Odd (numérico, formato sem zeros desnecessários)
+    # Dados ordenados — valores calculados, sem fórmulas
+    for row_idx, linha in enumerate(linhas, 2):
         cell = ws.cell(row=row_idx, column=1)
-        cell.value = float(item['Odd'])
+        cell.value = linha['odd']
         cell.number_format = '0.##'
         cell.alignment = center_alignment
 
-        # Coluna Verde
         cell = ws.cell(row=row_idx, column=2)
-        cell.value = item['Verde']
+        cell.value = linha['verde']
         cell.fill = verde_fill
         cell.alignment = center_alignment
 
-        # Coluna Vermelho
         cell = ws.cell(row=row_idx, column=3)
-        cell.value = item['Vermelho']
+        cell.value = linha['vermelho']
         cell.fill = vermelho_fill
         cell.alignment = center_alignment
 
-        # Coluna Total
         cell = ws.cell(row=row_idx, column=4)
-        cell.value = item['Total']
+        cell.value = linha['total']
         cell.alignment = center_alignment
 
-        # Coluna Odd Real = Verde / Total
         cell = ws.cell(row=row_idx, column=5)
-        cell.value = f'=IFERROR(B{row_idx}/D{row_idx},0)'
+        cell.value = linha['odd_real']
         cell.number_format = '0.00%'
         cell.alignment = center_alignment
 
-        # Coluna Teórica = 1 / Odd
         cell = ws.cell(row=row_idx, column=6)
-        cell.value = f'=1/A{row_idx}'
+        cell.value = linha['teorica']
         cell.number_format = '0.00%'
         cell.alignment = center_alignment
 
-        # Coluna Real - Teórica
         cell = ws.cell(row=row_idx, column=7)
-        cell.value = f'=E{row_idx}-F{row_idx}'
+        cell.value = linha['real_teo']
         cell.number_format = '0.00%'
         cell.alignment = center_alignment
 
-    # Ajustar largura das colunas
+    # Largura das colunas
     ws.column_dimensions['A'].width = 12
     ws.column_dimensions['B'].width = 12
     ws.column_dimensions['C'].width = 12
