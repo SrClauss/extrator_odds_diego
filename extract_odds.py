@@ -458,9 +458,9 @@ def clicar_botao_e_extrair(driver, workbook, texto_botao, nome_aba):
         print(f"❌ Erro ao clicar no botão '{texto_botao}': {e}")
         return
 
-    # Navegar para visualização 72 Horas/Linhas → Células
+    # Navegar para visualização 24 Horas/Linhas → Células
     try:
-        print("🔀 Selecionando visualização 72 Horas/Linhas...")
+        print("🔀 Selecionando visualização 24 Horas/Linhas...")
         linhas = WebDriverWait(driver, 10).until(
             EC.element_to_be_clickable((By.XPATH, "//span[contains(text(), 'Linhas')]"))
         )
@@ -472,7 +472,7 @@ def clicar_botao_e_extrair(driver, workbook, texto_botao, nome_aba):
         )
         from selenium.webdriver.support.ui import Select as _Select
         select2_ = _Select(select2_element)
-        select2_.select_by_visible_text("72 Horas/Linhas")
+        select2_.select_by_visible_text("24 Horas/Linhas")
         time.sleep(1)
 
         celulas = WebDriverWait(driver, 10).until(
@@ -480,7 +480,7 @@ def clicar_botao_e_extrair(driver, workbook, texto_botao, nome_aba):
         )
         celulas.click()
         time.sleep(2)
-        print("✓ Visualização 72 Horas/Linhas → Células aplicada!")
+        print("✓ Visualização 24 Horas/Linhas → Células aplicada!")
     except Exception as e:
         print(f"⚠️  Erro ao aplicar visualização Linhas/Células: {e}")
 
