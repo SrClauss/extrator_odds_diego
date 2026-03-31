@@ -11,27 +11,7 @@ import sys
 from datetime import datetime
 from collections import defaultdict
 
-# ─── LICENÇA ─────────────────────────────────────────────────
-DATA_EXPIRACAO = datetime(2026, 3, 31, 23, 59, 59)
-
-def verificar_licenca():
-    """Encerra o programa se a licença estiver expirada."""
-    agora = datetime.now()
-    if agora > DATA_EXPIRACAO:
-        print("\n" + "=" * 60)
-        print("  LICENÇA EXPIRADA")
-        print("=" * 60)
-        print(f"  Expirou em : {DATA_EXPIRACAO.strftime('%d/%m/%Y %H:%M')}")
-        print(f"  Data atual : {agora.strftime('%d/%m/%Y %H:%M')}")
-        print("  Entre em contato para renovar sua licença.")
-        print("=" * 60 + "\n")
-        sys.exit(1)
-    dias = (DATA_EXPIRACAO - agora).days
-    if dias <= 7:
-        print(f"\n  Atenção: licença expira em {dias} dia(s) ({DATA_EXPIRACAO.strftime('%d/%m/%Y')})\n")
-# ─────────────────────────────────────────────────────────────
-
-# Função para instalar pacotes caso não existam
+#               Função para instalar pacotes caso não existam
 def instalar_se_necessario(pacote, import_name=None):
     """Instala pacote se não estiver disponível"""
     if import_name is None:
@@ -517,8 +497,6 @@ def main():
     Extrai Over 2.5, Over 3.5 (Over Gols) e 5+ gols (Total de Gols Exatos)
     e salva tudo em um único arquivo Excel com 3 abas.
     """
-    verificar_licenca()
-
     print("=" * 60)
     print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
     print(" UltraVirtual → Bet365 → Placar FT → Odds")
