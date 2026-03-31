@@ -8,6 +8,7 @@ import re
 import time
 import subprocess
 import sys
+import unicodedata
 from datetime import datetime
 from collections import defaultdict
 
@@ -104,6 +105,19 @@ def agregar_odds(odds_data):
         })
     
     return dados_planilha
+
+
+def sanitizar_nome(nome):
+    """
+    Converte nome de competição para slug de arquivo.
+    Ex: 'Copa do Mundo' → 'copa_do_mundo'
+    """
+    nome = unicodedata.normalize('NFKD', nome)
+    nome = ''.join(c for c in nome if not unicodedata.combining(c))
+    nome = nome.lower()
+    nome = re.sub(r'[^a-z0-9]+', '_', nome)
+    nome = nome.strip('_')
+    return nome
 
 
 def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
@@ -332,6 +346,39 @@ def escolher_mercado(driver, mercado_selecionado):
         return mercado_selecionado
 
 
+def listar_competicoes(driver):
+    """
+    Lista todas as competições disponíveis na seção Bet365.
+    Deve ser chamada após navegar para a páginda do Bet365.
+    Retorna lista de dicts com 'nome' e 'url'.
+    """
+    competicoes = []
+    try:
+        links = WebDriverWait(driver, 10).until(
+            EC.presence_of_all_elements_located(
+                (By.XPATH, "//a[contains(@href, '/dashboard/bet365/')]"
+            ))
+        )
+        vistos = set()
+        for link in links:
+            href = link.get_attribute('href') or ''
+            nome = link.text.strip()
+            if not nome or href in vistos:
+                continue
+            if '/dashboard/bet365/' in href:
+                vistos.add(href)
+                competicoes.append({'nome': nome, 'url': href})
+        print(f"✓ {len(competicoes)} competições encontradas!")
+    except Exception as e:
+        print(f"⚠️  Erro ao listar competições: {e}")
+
+    if not competicoes:
+        print("⚠️  Usando fallback: Copa do Mundo")
+        competicoes = [{'nome': 'Copa do Mundo', 'url': 'https://ultravirtual.com.br/dashboard/bet365/world/hourly'}]
+
+    return competicoes
+
+
 def fazer_login(driver):
     """
     Faz login no site UltraVirtual.
@@ -372,22 +419,18 @@ def fazer_login(driver):
         return False
 
 
-def navegar_ate_odds(driver):
+def navegar_ate_odds(driver, url=None):
     """
-    Navega até a página de odds do Bet365 (Placar FT → Odds) e aguarda o grid carregar.
+    Navega até a página de odds de uma competição (Placar FT → Odds) e aguarda o grid carregar.
+    Se url não for informado, usa Copa do Mundo como padrão.
     """
+    if url is None:
+        url = "https://ultravirtual.com.br/dashboard/bet365/world/hourly"
     try:
-        print("\n🎯 Navegando até Bet365...")
+        print(f"\n🎯 Navegando para: {url}")
 
-        # Clicar em Bet365
-        span_bet365 = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//*[text()='Bet365']"))
-        )
-        span_bet365.click()
-        time.sleep(1)
-
-        # Ir direto para a URL
-        driver.get("https://ultravirtual.com.br/dashboard/bet365/world/hourly")
+        # Ir direto para a URL da competição
+        driver.get(url)
         time.sleep(2)
 
         # Clicar em Placar FT
@@ -491,26 +534,51 @@ def clicar_botao_e_extrair(driver, workbook, texto_botao, nome_aba):
     print(f"✅ Aba adicionada: '{nome_aba}'")
 
 
+def extrair_competicao(driver, workbook, competicao_url):
+    """
+    Para uma competição já carregada, executa as 4 extrações de mercado
+    e popula o workbook com as abas correspondentes.
+    """
+    # 1) Over Gols → Over 2.5
+    print("\n" + "=" * 60)
+    print(" [1/4] Over Gols → Over 2.5")
+    print("=" * 60)
+    escolher_mercado(driver, "Over Gols")
+    clicar_botao_e_extrair(driver, workbook, "Over 2.5", "Over 2.5")
+
+    # 2) Over Gols → Over 3.5
+    print("\n" + "=" * 60)
+    print(" [2/4] Over Gols → Over 3.5")
+    print("=" * 60)
+    clicar_botao_e_extrair(driver, workbook, "Over 3.5", "Over 3.5")
+
+    # 3) Total de Gols Exatos → 5+ gols
+    print("\n" + "=" * 60)
+    print(" [3/4] Total de Gols Exatos → 5+ gols")
+    print("=" * 60)
+    escolher_mercado(driver, "Total de Gols Exatos")
+    clicar_botao_e_extrair(driver, workbook, "5+ gols", "5+ gols")
+
+    # 4) Para o Time Marcar Sim/Não → Ambas Sim
+    print("\n" + "=" * 60)
+    print(" [4/4] Para o Time Marcar Sim/Não → Ambas Sim")
+    print("=" * 60)
+    escolher_mercado(driver, "Para o Time Marcar Sim/Não")
+    clicar_botao_e_extrair(driver, workbook, "Ambas Sim", "Ambas Sim")
+
+
 def main():
     """
-    Função principal - fluxo automático sem interação:
-    Extrai Over 2.5, Over 3.5 (Over Gols) e 5+ gols (Total de Gols Exatos)
-    e salva tudo em um único arquivo Excel com 3 abas.
+    Função principal - raspa todas as competições disponíveis no Bet365,
+    criando um arquivo Excel separado para cada uma.
+    Formato do arquivo: {slug_competicao}_{timestamp}.xlsx
     """
     print("=" * 60)
     print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
-    print(" UltraVirtual → Bet365 → Placar FT → Odds")
+    print(" UltraVirtual → Bet365 → Todas as Competições")
     print("=" * 60)
 
-    # Gerar nome do arquivo automaticamente com timestamp
     timestamp = datetime.now().strftime("%d%m%Y_%H%M")
-    nome_arquivo = f"odds_{timestamp}.xlsx"
-    print(f"\n✓ Arquivo será salvo como: {nome_arquivo}")
-
-    # Criar workbook e remover aba padrão
-    workbook = Workbook()
-    if 'Sheet' in workbook.sheetnames:
-        del workbook['Sheet']
 
     # Inicializar Selenium
     print("\n🌐 Iniciando navegador Chrome...")
@@ -523,6 +591,8 @@ def main():
         print("💡 Certifique-se de ter o Google Chrome instalado")
         return
 
+    arquivos_salvos = []
+
     try:
         # Abrir site e fazer login
         print("\n🔗 Acessando UltraVirtual...")
@@ -530,57 +600,65 @@ def main():
         time.sleep(2)
 
         if not fazer_login(driver):
-            driver.quit()
             return
 
-        # Navegar até Bet365 → Placar FT → Odds
-        if not navegar_ate_odds(driver):
-            driver.quit()
-            return
+        # Navegar para o Bet365 para listar as competições
+        print("\n🎯 Abrindo seção Bet365 para listar competições...")
+        span_bet365 = WebDriverWait(driver, 10).until(
+            EC.element_to_be_clickable((By.XPATH, "//*[text()='Bet365']"))
+        )
+        span_bet365.click()
+        time.sleep(2)
 
-        # --- Sequência fixa do notebook ---
+        competicoes = listar_competicoes(driver)
+        print(f"\n📋 Competições a processar: {[c['nome'] for c in competicoes]}")
 
-        # 1) Over Gols → Over 2.5
-        print("\n" + "=" * 60)
-        print(" [1/4] Over Gols → Over 2.5")
-        print("=" * 60)
-        escolher_mercado(driver, "Over Gols")
-        clicar_botao_e_extrair(driver, workbook, "Over 2.5", "Over 2.5")
+        for idx, competicao in enumerate(competicoes, 1):
+            nome_comp = competicao['nome']
+            url_comp = competicao['url']
+            slug = sanitizar_nome(nome_comp)
+            nome_arquivo = f"{slug}_{timestamp}.xlsx"
 
-        # 2) Over Gols → Over 3.5
-        print("\n" + "=" * 60)
-        print(" [2/4] Over Gols → Over 3.5")
-        print("=" * 60)
-        clicar_botao_e_extrair(driver, workbook, "Over 3.5", "Over 3.5")
+            print("\n" + "#" * 60)
+            print(f" [{idx}/{len(competicoes)}] {nome_comp}")
+            print(f" Arquivo: {nome_arquivo}")
+            print("#" * 60)
 
-        # 3) Total de Gols Exatos → 5+ gols
-        print("\n" + "=" * 60)
-        print(" [3/4] Total de Gols Exatos → 5+ gols")
-        print("=" * 60)
-        escolher_mercado(driver, "Total de Gols Exatos")
-        clicar_botao_e_extrair(driver, workbook, "5+ gols", "5+ gols")
+            if not navegar_ate_odds(driver, url=url_comp):
+                print(f"⚠️  Pulando competição: {nome_comp}")
+                continue
 
-        # 4) Para o Time Marcar Sim/Não → Ambas Sim
-        print("\n" + "=" * 60)
-        print(" [4/4] Para o Time Marcar Sim/Não → Ambas Sim")
-        print("=" * 60)
-        escolher_mercado(driver, "Para o Time Marcar Sim/Não")
-        clicar_botao_e_extrair(driver, workbook, "Ambas Sim", "Ambas Sim")
+            workbook = Workbook()
+            if 'Sheet' in workbook.sheetnames:
+                del workbook['Sheet']
 
+            extrair_competicao(driver, workbook, url_comp)
+
+            if workbook.sheetnames:
+                try:
+                    workbook.save(nome_arquivo)
+                    arquivos_salvos.append(nome_arquivo)
+                    print(f"✅ Arquivo salvo: {nome_arquivo}  (abas: {', '.join(workbook.sheetnames)})")
+                except Exception as e:
+                    print(f"❌ Erro ao salvar {nome_arquivo}: {e}")
+            else:
+                print(f"⚠️  Nenhuma aba gerada para '{nome_comp}', arquivo não salvo.")
+
+    except Exception as e:
+        print(f"❌ Erro inesperado: {e}")
     finally:
         print("\n🔒 Fechando navegador...")
         driver.quit()
 
-    # Salvar workbook
-    print("\n📊 Salvando arquivo...")
-    try:
-        workbook.save(nome_arquivo)
-        print(f"✅ Arquivo salvo com sucesso: {nome_arquivo}")
-        print(f"   Abas criadas: {', '.join(workbook.sheetnames)}")
-    except Exception as e:
-        print(f"❌ Erro ao salvar arquivo: {e}")
-
-    print("\n✨ Processo finalizado!")
+    print("\n" + "=" * 60)
+    print(" RESUMO FINAL")
+    print("=" * 60)
+    if arquivos_salvos:
+        print(f"✨ {len(arquivos_salvos)} arquivo(s) gerado(s):")
+        for arq in arquivos_salvos:
+            print(f"   • {arq}")
+    else:
+        print("⚠️  Nenhum arquivo foi gerado.")
     print("=" * 60)
 
 
