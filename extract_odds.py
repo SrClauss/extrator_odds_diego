@@ -346,37 +346,19 @@ def escolher_mercado(driver, mercado_selecionado):
         return mercado_selecionado
 
 
-def listar_competicoes(driver):
+def listar_competicoes():
     """
-    Lista todas as competições disponíveis na seção Bet365.
-    Deve ser chamada após navegar para a páginda do Bet365.
-    Retorna lista de dicts com 'nome' e 'url'.
+    Retorna a lista fixa de competições disponíveis no Bet365 do UltraVirtual.
+    Baseada nos ícones do menu: world, euro, premier, super, express.
     """
-    competicoes = []
-    try:
-        links = WebDriverWait(driver, 10).until(
-            EC.presence_of_all_elements_located(
-                (By.XPATH, "//a[contains(@href, '/dashboard/bet365/')]"
-            ))
-        )
-        vistos = set()
-        for link in links:
-            href = link.get_attribute('href') or ''
-            nome = link.text.strip()
-            if not nome or href in vistos:
-                continue
-            if '/dashboard/bet365/' in href:
-                vistos.add(href)
-                competicoes.append({'nome': nome, 'url': href})
-        print(f"✓ {len(competicoes)} competições encontradas!")
-    except Exception as e:
-        print(f"⚠️  Erro ao listar competições: {e}")
-
-    if not competicoes:
-        print("⚠️  Usando fallback: Copa do Mundo")
-        competicoes = [{'nome': 'Copa do Mundo', 'url': 'https://ultravirtual.com.br/dashboard/bet365/world/hourly'}]
-
-    return competicoes
+    base = "https://ultravirtual.com.br"
+    return [
+        {'nome': 'Copa do Mundo',           'url': f'{base}/dashboard/bet365/world/hourly'},
+        {'nome': 'Euro Cup',                'url': f'{base}/dashboard/bet365/euro/hourly'},
+        {'nome': 'Premier League',          'url': f'{base}/dashboard/bet365/premier/hourly'},
+        {'nome': 'Superliga Sul-Americana', 'url': f'{base}/dashboard/bet365/super/hourly'},
+        {'nome': 'Express',                 'url': f'{base}/dashboard/bet365/express/hourly'},
+    ]
 
 
 def fazer_login(driver):
@@ -602,15 +584,7 @@ def main():
         if not fazer_login(driver):
             return
 
-        # Navegar para o Bet365 para listar as competições
-        print("\n🎯 Abrindo seção Bet365 para listar competições...")
-        span_bet365 = WebDriverWait(driver, 10).until(
-            EC.element_to_be_clickable((By.XPATH, "//*[text()='Bet365']"))
-        )
-        span_bet365.click()
-        time.sleep(2)
-
-        competicoes = listar_competicoes(driver)
+        competicoes = listar_competicoes()
         print(f"\n📋 Competições a processar: {[c['nome'] for c in competicoes]}")
 
         for idx, competicao in enumerate(competicoes, 1):
