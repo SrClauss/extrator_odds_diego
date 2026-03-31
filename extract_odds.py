@@ -171,7 +171,7 @@ def adicionar_sheet_excel(workbook, dados_planilha, nome_sheet):
     for row_idx, linha in enumerate(linhas, 2):
         cell = ws.cell(row=row_idx, column=1)
         cell.value = linha['odd']
-        cell.number_format = '0.##'
+        cell.number_format = '0.####'
         cell.alignment = center_alignment
 
         cell = ws.cell(row=row_idx, column=2)
