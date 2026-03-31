@@ -626,21 +626,50 @@ def processar_competicao(competicao, timestamp, driver_path):
             pass
 
 
+def escolher_competicoes(todas):
+    """
+    Exibe menu numerado de competições e retorna a lista escolhida pelo usuário.
+    Opção 'Todos' raspa tudo. Aceita múltiplas seleções separadas por vírgula.
+    """
+    print("\n" + "=" * 60)
+    print(" SELECIONE A(S) COMPETIÇÃO(ÕES)")
+    print("=" * 60)
+    for i, c in enumerate(todas, 1):
+        print(f"  {i}. {c['nome']}")
+    print(f"  {len(todas) + 1}. Todos")
+    print("=" * 60)
+
+    while True:
+        entrada = input("Digite o número (ou vários separados por vírgula): ").strip()
+        try:
+            escolhas = [int(x.strip()) for x in entrada.split(',')]
+            # opção "Todos"
+            if len(todas) + 1 in escolhas:
+                return todas
+            # valida todos os números
+            if all(1 <= e <= len(todas) for e in escolhas):
+                return [todas[e - 1] for e in escolhas]
+            print(f"❌ Digite números entre 1 e {len(todas) + 1}.")
+        except ValueError:
+            print("❌ Entrada inválida. Use números separados por vírgula.")
+
+
 def main():
     """
-    Função principal — raspa todas as competições sequencialmente,
-    criando um arquivo Excel por competição.
-    Formato: {slug_competicao}_{timestamp}.xlsx
+    Função principal — permite escolher quais competições raspar,
+    depois processa cada uma sequencialmente.
+    Formato do arquivo: {slug_competicao}_{timestamp}.xlsx
     """
     print("=" * 60)
     print(" EXTRATOR AUTOMÁTICO DE ODDS PARA EXCEL")
-    print(" UltraVirtual → Bet365 → Todas as Competições")
+    print(" UltraVirtual → Bet365")
     print("=" * 60)
 
-    timestamp   = datetime.now().strftime("%d%m%Y_%H%M")
-    competicoes = listar_competicoes()
+    timestamp    = datetime.now().strftime("%d%m%Y_%H%M")
+    todas        = listar_competicoes()
+    competicoes  = escolher_competicoes(todas)
 
-    print(f"\n📋 Competições a processar: {[c['nome'] for c in competicoes]}")
+    print(f"\n📋 Competições selecionadas: {[c['nome'] for c in competicoes]}")
 
     print("\n🔧 Verificando ChromeDriver...")
     try:
